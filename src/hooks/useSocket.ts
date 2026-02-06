@@ -88,10 +88,18 @@ export function useSocket() {
     
     s.on("connect_error", (error: Error) => {
       const errorMessage = error.message || "Connection failed";
-      if (process.env.NODE_ENV === "development") {
-        console.error("[useSocket] Connection error:", errorMessage);
+      console.error("[useSocket] Connection error:", errorMessage);
+      
+      let userFriendlyError = "Connection failed";
+      if (errorMessage.includes("xhr poll error") || errorMessage.includes("polling")) {
+        userFriendlyError = "Unable to connect to server. Please check your connection.";
+      } else if (errorMessage.includes("timeout")) {
+        userFriendlyError = "Connection timeout. Please try again.";
+      } else {
+        userFriendlyError = errorMessage;
       }
-      setConnectionError(errorMessage);
+      
+      setConnectionError(userFriendlyError);
       setConnected(false);
       setConnecting(false);
     });

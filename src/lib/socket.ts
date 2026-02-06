@@ -55,8 +55,15 @@ export function getSocket(): Socket {
     });
     
     socket.on("connect_error", (error: Error) => {
-      if (process.env.NODE_ENV === "development") {
-        console.error("[Socket] Connection error:", error.message);
+      const errorMsg = error.message || "Unknown connection error";
+      console.error("[Socket] Connection error:", errorMsg);
+      
+      if (errorMsg.includes("xhr poll error") || errorMsg.includes("polling")) {
+        console.error("[Socket] ⚠️ Polling transport failed. This may indicate:");
+        console.error("  1. Socket.IO server is not running or accessible");
+        console.error("  2. CORS configuration issue");
+        console.error("  3. Vercel serverless functions don't support Socket.IO");
+        console.error("  Consider hosting Socket.IO server on Railway, Render, or Fly.io");
       }
     });
     
