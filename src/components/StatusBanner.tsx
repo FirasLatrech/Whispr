@@ -21,7 +21,7 @@ export default function StatusBanner({
 }: StatusBannerProps) {
   if (!connected) {
     return (
-      <div className="flex items-center justify-center gap-2 py-2 px-4 text-xs text-muted-foreground bg-muted rounded-lg">
+      <div className="flex items-center justify-center gap-2 py-2 px-4 text-sm text-muted-foreground bg-muted rounded-lg">
         <span className="size-1.5 rounded-full bg-muted-foreground animate-pulse" />
         Connecting...
       </div>
@@ -30,7 +30,7 @@ export default function StatusBanner({
 
   if (roomFull) {
     return (
-      <div className="flex items-center justify-center gap-2 py-2 px-4 text-xs text-destructive bg-destructive/10 rounded-lg">
+      <div className="flex items-center justify-center gap-2 py-2 px-4 text-sm text-destructive bg-destructive/10 rounded-lg">
         <span className="size-1.5 rounded-full bg-destructive" />
         Room is full
       </div>
@@ -39,7 +39,7 @@ export default function StatusBanner({
 
   if (!peerConnected) {
     return (
-      <div className="flex items-center justify-center gap-2 py-2 px-4 text-xs text-muted-foreground bg-muted rounded-lg">
+      <div className="flex items-center justify-center gap-2 py-2 px-4 text-sm text-muted-foreground bg-muted rounded-lg">
         <span className="size-1.5 rounded-full bg-chart-1 animate-pulse" />
         Waiting for peer...
       </div>
@@ -47,7 +47,7 @@ export default function StatusBanner({
   }
 
   return (
-    <div className="flex items-center justify-center gap-2 py-2 px-4 text-xs text-muted-foreground bg-muted rounded-lg">
+    <div className="flex items-center justify-center gap-2 py-2 px-4 text-sm text-muted-foreground bg-muted rounded-lg">
       <span className="size-1.5 rounded-full bg-primary" />
       <span>{peerName} connected</span>
       {encrypted && (

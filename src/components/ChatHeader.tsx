@@ -39,15 +39,15 @@ export default function ChatHeader({
     <header className="flex items-center justify-between px-4 py-3 border-b border-border">
       <div className="flex items-center gap-3">
         <Logo size={22} />
-        <h1 className="text-sm font-medium text-foreground tracking-tight">
+        <h1 className="text-base font-medium text-foreground tracking-tight">
           whispr
         </h1>
-        <span className="text-[10px] text-muted-foreground font-mono">
+        <span className="text-xs text-muted-foreground font-mono">
           #{roomId.slice(0, 8)}
         </span>
         {encrypted && (
-          <Badge variant="outline" className="gap-1 text-primary border-primary/20 bg-primary/10 text-[10px] py-0">
-            <Lock className="size-2.5" />
+          <Badge variant="outline" className="gap-1 text-primary border-primary/20 bg-primary/10 text-xs py-0">
+            <Lock className="size-3" />
             e2ee
           </Badge>
         )}
@@ -61,14 +61,14 @@ export default function ChatHeader({
               ) : (
                 <Copy className="size-3.5" />
               )}
-              <span className="text-xs">{copied ? "copied" : "copy link"}</span>
+              <span className="text-sm">{copied ? "copied" : "copy link"}</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>Copy room link to clipboard</TooltipContent>
         </Tooltip>
         <Button variant="destructive" size="sm" onClick={onEndChat}>
           <LogOut className="size-3.5" />
-          <span className="text-xs">end chat</span>
+          <span className="text-sm">end chat</span>
         </Button>
       </div>
     </header>

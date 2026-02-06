@@ -16,6 +16,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSocket } from "@/hooks/useSocket";
 import { useMessages } from "@/hooks/useMessages";
 import { sanitizeName } from "@/lib/utils";
+import { playTypingSound } from "@/lib/sounds";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ChatHeader from "@/components/ChatHeader";
@@ -31,6 +32,7 @@ const Antigravity = dynamic(() => import("@/components/Antigravity"), {
 });
 
 const SESSION_KEY_PREFIX = "whispr:name:";
+const CHAT_ACTIVE_KEY_PREFIX = "whispr:active:";
 
 function getStoredName(roomId: string): string {
   if (typeof window === "undefined") return "";
@@ -39,10 +41,17 @@ function getStoredName(roomId: string): string {
 
 function storeName(roomId: string, name: string): void {
   sessionStorage.setItem(`${SESSION_KEY_PREFIX}${roomId}`, name);
+  sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
 }
 
 function clearStoredName(roomId: string): void {
   sessionStorage.removeItem(`${SESSION_KEY_PREFIX}${roomId}`);
+  sessionStorage.removeItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`);
+}
+
+function isChatActive(roomId: string): boolean {
+  if (typeof window === "undefined") return false;
+  return sessionStorage.getItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`) === "true";
 }
 
 export default function ChatPage() {
@@ -50,9 +59,20 @@ export default function ChatPage() {
   const router = useRouter();
   const roomId = params.roomId as string;
 
-  const [name, setName] = useState("");
-  const [joined, setJoined] = useState(false);
+  const savedName = typeof window !== "undefined" ? getStoredName(roomId) : "";
+  const chatActive = typeof window !== "undefined" ? isChatActive(roomId) : false;
+  const [name, setName] = useState(savedName || "");
+  const [joined, setJoined] = useState(!!savedName);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const hasAttemptedRejoin = useRef(false);
+
+  // Set active flag if we have a saved name but no active flag (backward compatibility)
+  useEffect(() => {
+    if (savedName && !chatActive && typeof window !== "undefined") {
+      sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
+    }
+  }, [savedName, chatActive, roomId]);
 
   const {
     connected,
@@ -71,18 +91,28 @@ export default function ChatPage() {
   } = useSocket();
 
   const { messages, sendMessage, clear } = useMessages(roomId, sharedKey, isFirstUser);
+  const prevTypingUser = useRef<string | null>(null);
 
-  // --------------------------------------------------------
-  // Restore name from sessionStorage on mount (survive reload)
-  // --------------------------------------------------------
+  // Play typing sound when peer starts typing
   useEffect(() => {
-    const saved = getStoredName(roomId);
-    if (saved) {
-      setName(saved);
-      joinRoom(roomId, saved, true);
-      setJoined(true);
+    if (typingUser && typingUser !== prevTypingUser.current) {
+      playTypingSound();
+      prevTypingUser.current = typingUser;
+    } else if (!typingUser) {
+      prevTypingUser.current = null;
     }
-  }, [roomId, joinRoom]);
+  }, [typingUser]);
+
+  // Rejoin room when socket connects (for reload scenario)
+  useEffect(() => {
+    if (hasAttemptedRejoin.current) return;
+    
+    const saved = getStoredName(roomId);
+    if (saved && connected && joined) {
+      hasAttemptedRejoin.current = true;
+      joinRoom(roomId, saved, true);
+    }
+  }, [roomId, joinRoom, connected, joined]);
 
   // auto-scroll on new messages
   useEffect(() => {
@@ -90,10 +120,36 @@ export default function ChatPage() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, typingUser]);
 
+  // scroll progress indicator
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    function updateScrollProgress() {
+      if (!el) return;
+      const scrollTop = el.scrollTop;
+      const scrollHeight = el.scrollHeight;
+      const clientHeight = el.clientHeight;
+      const totalScroll = scrollHeight - clientHeight;
+      const progress = totalScroll > 0 ? (scrollTop / totalScroll) * 100 : 0;
+      setScrollProgress(progress);
+    }
+
+    el.addEventListener("scroll", updateScrollProgress);
+    updateScrollProgress();
+
+    return () => {
+      if (el) {
+        el.removeEventListener("scroll", updateScrollProgress);
+      }
+    };
+  }, [messages]);
+
   // handle chat ended
   useEffect(() => {
     if (chatEnded) {
       clearStoredName(roomId);
+      setJoined(false);
       clear();
       setTimeout(() => router.push("/"), 1500);
     }
@@ -108,12 +164,14 @@ export default function ChatPage() {
       storeName(roomId, cleaned);
       joinRoom(roomId, cleaned);
       setJoined(true);
+      sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
     },
     [name, roomId, joinRoom]
   );
 
   function handleEndChat() {
     clearStoredName(roomId);
+    setJoined(false);
     endChat(roomId);
     clear();
     router.push("/");
@@ -181,28 +239,28 @@ export default function ChatPage() {
         </div>
         <form
           onSubmit={handleJoin}
-          className="pointer-events-none flex flex-col items-center gap-4 px-6 py-8 rounded-2xl bg-background/80 backdrop-blur-xl border border-border/50 relative"
+          className="pointer-events-none flex flex-col items-center gap-4 px-6 py-8 rounded-2xl bg-background/80 backdrop-blur-xl border border-border/50 relative w-full max-w-md"
         >
-          <h2 className="text-lg font-medium text-foreground tracking-tight">
+          <h2 className="text-xl font-medium text-foreground tracking-tight">
             Join chat
           </h2>
-          <p className="text-xs text-muted-foreground">Room #{roomId}</p>
+          <p className="text-sm text-muted-foreground">Room #{roomId}</p>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Your name"
             autoFocus
             maxLength={24}
-            className="w-56 text-center pointer-events-auto"
+            className="w-full text-center pointer-events-auto"
           />
           <Button
             type="submit"
             disabled={!name.trim()}
-            className="rounded-xl pointer-events-auto"
+            className="w-full rounded-xl pointer-events-auto"
           >
             Join
           </Button>
-          <p className="text-[10px] text-muted-foreground/60 text-center max-w-[200px]">
+          <p className="text-xs text-muted-foreground/60 text-center max-w-[200px]">
             Messages are end-to-end encrypted and never stored on our servers
           </p>
           <GitHubStars />
@@ -238,15 +296,21 @@ export default function ChatPage() {
   const canSend = encrypted && peerConnected;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="max-w-[600px] w-full mx-auto flex flex-col h-screen">
+    <div className="min-h-screen flex flex-col w-full">
+      <div className="w-full flex flex-col h-screen">
         <ChatHeader
           roomId={roomId}
           encrypted={encrypted}
           onEndChat={handleEndChat}
         />
 
-        <div className="px-4 py-2">
+        <div className="px-4 py-2 relative">
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-border/30">
+            <div
+              className="h-full bg-primary transition-all duration-150 ease-out"
+              style={{ width: `${scrollProgress}%` }}
+            />
+          </div>
           <StatusBanner
             connected={connected}
             peerConnected={peerConnected}
@@ -258,11 +322,11 @@ export default function ChatPage() {
 
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto py-4 space-y-3 scrollbar-hide"
+          className="flex-1 overflow-y-auto py-4 px-4 space-y-3 scrollbar-hide"
         >
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full">
-              <p className="text-xs text-muted-foreground/40">
+              <p className="text-sm text-muted-foreground/40">
                 {peerConnected
                   ? encrypted
                     ? "Send a message to start the conversation"

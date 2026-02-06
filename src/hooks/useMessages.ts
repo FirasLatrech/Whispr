@@ -13,6 +13,7 @@ import { saveMessage, getMessages, clearRoom, cleanExpired } from "@/lib/db";
 import { getSocket } from "@/lib/socket";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { sanitizeText, sanitizeName } from "@/lib/utils";
+import { playMessageSentSound, playMessageReceivedSound } from "@/lib/sounds";
 import type { ChatMessage, MessageType } from "@/types";
 
 export function useMessages(
@@ -23,18 +24,28 @@ export function useMessages(
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const initialized = useRef(false);
   const sharedKeyRef = useRef<CryptoKey | null>(sharedKey);
+  const syncHistorySent = useRef(false);
+  const currentRoomId = useRef<string>("");
 
   // Keep ref in sync
   useEffect(() => {
     sharedKeyRef.current = sharedKey;
   }, [sharedKey]);
 
-  // Load from IndexedDB on mount
+  // Reset flags and reload messages when room changes
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-    cleanExpired();
-    getMessages(roomId).then(setMessages);
+    if (currentRoomId.current !== roomId) {
+      currentRoomId.current = roomId;
+      syncHistorySent.current = false;
+      initialized.current = false;
+    }
+    
+    // Load messages for current room
+    if (!initialized.current) {
+      initialized.current = true;
+      cleanExpired();
+      getMessages(roomId).then(setMessages);
+    }
   }, [roomId]);
 
   // Listen for incoming messages
@@ -49,14 +60,22 @@ export function useMessages(
       timestamp: number;
     }) => {
       const key = sharedKeyRef.current;
-      if (!key) return;
+      if (!key) {
+        console.warn("[useMessages] No shared key for decryption");
+        return;
+      }
+
+      // Only process messages for current room
+      if (currentRoomId.current !== roomId) {
+        return;
+      }
 
       try {
         const plaintext = await decrypt(key, wire.encrypted, wire.iv);
         const parsed = JSON.parse(plaintext) as { text?: string; data?: string };
 
         const saved = await saveMessage({
-          roomId,
+          roomId: currentRoomId.current,
           sender: sanitizeName(wire.sender),
           type: wire.type,
           text: parsed.text ? sanitizeText(parsed.text) : undefined,
@@ -64,9 +83,14 @@ export function useMessages(
           timestamp: wire.timestamp,
           isMine: false,
         });
-        setMessages((prev) => [...prev, saved]);
-      } catch {
-        // decryption failed
+        
+        // Only update if still in same room
+        if (currentRoomId.current === roomId) {
+          setMessages((prev) => [...prev, saved]);
+          playMessageReceivedSound();
+        }
+      } catch (error) {
+        console.warn("[useMessages] Decryption failed:", error);
       }
     };
 
@@ -78,15 +102,17 @@ export function useMessages(
 
   // Sync history to new peer when they join
   useEffect(() => {
-    if (!isFirstUser || !sharedKey) return;
+    if (!isFirstUser || !sharedKey || syncHistorySent.current) return;
 
     const socket = getSocket();
     const handler = async () => {
       const key = sharedKeyRef.current;
-      if (!key) return;
+      if (!key || syncHistorySent.current) return;
 
       const localMessages = await getMessages(roomId);
       if (localMessages.length === 0) return;
+
+      syncHistorySent.current = true;
 
       const encrypted = await Promise.all(
         localMessages.map(async (msg) => {
@@ -105,7 +131,6 @@ export function useMessages(
       socket.emit("sync-history", { roomId, messages: encrypted });
     };
 
-    // Send history once encryption is established
     handler();
   }, [isFirstUser, sharedKey, roomId]);
 
@@ -157,33 +182,50 @@ export function useMessages(
   const sendMessage = useCallback(
     async (sender: string, type: MessageType, text?: string, data?: string) => {
       const key = sharedKeyRef.current;
-      if (!key) return;
+      if (!key) {
+        console.warn("[useMessages] Cannot send message: no shared key");
+        return;
+      }
 
-      const cleanText = text ? sanitizeText(text) : undefined;
-      const timestamp = Date.now();
-      const plaintext = JSON.stringify({ text: cleanText, data });
-      const enc = await encrypt(key, plaintext);
+      if (currentRoomId.current !== roomId) {
+        console.warn("[useMessages] Cannot send message: room mismatch");
+        return;
+      }
 
-      const socket = getSocket();
-      socket.emit("send-message", {
-        roomId,
-        sender: sanitizeName(sender),
-        type,
-        encrypted: enc.encrypted,
-        iv: enc.iv,
-        timestamp,
-      });
+      try {
+        const cleanText = text ? sanitizeText(text) : undefined;
+        const timestamp = Date.now();
+        const plaintext = JSON.stringify({ text: cleanText, data });
+        const enc = await encrypt(key, plaintext);
 
-      const saved = await saveMessage({
-        roomId,
-        sender: sanitizeName(sender),
-        type,
-        text: cleanText,
-        data,
-        timestamp,
-        isMine: true,
-      });
-      setMessages((prev) => [...prev, saved]);
+        const socket = getSocket();
+        socket.emit("send-message", {
+          roomId: currentRoomId.current,
+          sender: sanitizeName(sender),
+          type,
+          encrypted: enc.encrypted,
+          iv: enc.iv,
+          timestamp,
+        });
+
+        const saved = await saveMessage({
+          roomId: currentRoomId.current,
+          sender: sanitizeName(sender),
+          type,
+          text: cleanText,
+          data,
+          timestamp,
+          isMine: true,
+        });
+        
+        // Only update if still in same room
+        if (currentRoomId.current === roomId) {
+          setMessages((prev) => [...prev, saved]);
+          playMessageSentSound();
+        }
+      } catch (error) {
+        console.error("[useMessages] Failed to send message:", error);
+      }
     },
     [roomId]
   );

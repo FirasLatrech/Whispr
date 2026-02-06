@@ -18,7 +18,7 @@ export default function ChatBubble({ msg }: { msg: ChatMessage }) {
     <div
       className={cn("flex flex-col px-4", mine ? "items-end" : "items-start")}
     >
-      <span className="text-[10px] text-muted-foreground mb-1 px-1">
+      <span className="text-xs text-muted-foreground mb-1 px-1">
         {msg.sender}
       </span>
       <div
@@ -30,7 +30,7 @@ export default function ChatBubble({ msg }: { msg: ChatMessage }) {
         )}
       >
         {msg.type === "text" && (
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+          <p className="text-base leading-relaxed whitespace-pre-wrap">
             {msg.text}
           </p>
         )}
@@ -57,7 +57,7 @@ export default function ChatBubble({ msg }: { msg: ChatMessage }) {
 
         {msg.type === "voice" && msg.data && <VoicePlayer src={msg.data} />}
       </div>
-      <span className="text-[10px] text-muted-foreground/60 mt-1 px-1">
+      <span className="text-xs text-muted-foreground/60 mt-1 px-1">
         {formatTime(msg.timestamp)}
       </span>
     </div>
