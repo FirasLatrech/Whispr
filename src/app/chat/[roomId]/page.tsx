@@ -47,12 +47,14 @@ function getStoredName(roomId: string): string {
 }
 
 function storeName(roomId: string, name: string): void {
+  if (typeof window === "undefined") return;
   sessionStorage.setItem(`${SESSION_KEY_PREFIX}${roomId}`, name);
   sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
   storageCache.set(roomId, { name, active: true });
 }
 
 function clearStoredName(roomId: string): void {
+  if (typeof window === "undefined") return;
   sessionStorage.removeItem(`${SESSION_KEY_PREFIX}${roomId}`);
   sessionStorage.removeItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`);
   storageCache.delete(roomId);
@@ -73,20 +75,32 @@ export default function ChatPage() {
   const router = useRouter();
   const roomId = params.roomId as string;
 
-  const savedName = typeof window !== "undefined" ? getStoredName(roomId) : "";
-  const chatActive = typeof window !== "undefined" ? isChatActive(roomId) : false;
-  const [name, setName] = useState(savedName || "");
-  const [joined, setJoined] = useState(!!savedName);
+  const [name, setName] = useState("");
+  const [joined, setJoined] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const hasAttemptedRejoin = useRef(false);
+  const initialized = useRef(false);
 
-  // Set active flag if we have a saved name but no active flag (backward compatibility)
+  // Initialize from sessionStorage on mount (client-side only)
   useEffect(() => {
-    if (!savedName || chatActive || typeof window === "undefined") return;
-    sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
-    storageCache.set(roomId, { name: savedName, active: true });
-  }, [savedName, chatActive, roomId]);
+    if (initialized.current || typeof window === "undefined") return;
+    initialized.current = true;
+
+    const savedName = getStoredName(roomId);
+    const chatActive = isChatActive(roomId);
+
+    if (savedName) {
+      setName(savedName);
+      setJoined(true);
+      
+      // Set active flag if missing (backward compatibility)
+      if (!chatActive) {
+        sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
+        storageCache.set(roomId, { name: savedName, active: true });
+      }
+    }
+  }, [roomId]);
 
   const {
     connected,
