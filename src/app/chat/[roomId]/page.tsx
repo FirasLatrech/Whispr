@@ -24,6 +24,7 @@ import ChatInput from "@/components/ChatInput";
 import StatusBanner from "@/components/StatusBanner";
 import TypingIndicator from "@/components/TypingIndicator";
 import CaptchaChallenge from "@/components/CaptchaChallenge";
+import GitHubStars from "@/components/GitHubStars";
 import dynamic from "next/dynamic";
 
 const Antigravity = dynamic(() => import("@/components/Antigravity"), {
@@ -228,6 +229,7 @@ export default function ChatPage() {
           <p className="text-[10px] text-muted-foreground/60 text-center max-w-[200px]">
             Messages are end-to-end encrypted and never stored on our servers
           </p>
+          <GitHubStars />
         </form>
       </div>
     );

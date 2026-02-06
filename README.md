@@ -1,5 +1,7 @@
 # Whispr
 
+[![GitHub stars](https://img.shields.io/github/stars/FirasLatrech/Whispr?style=social)](https://github.com/FirasLatrech/Whispr)
+
 Ephemeral 1-on-1 encrypted chat. No accounts. No history. No trace.
 
 ---

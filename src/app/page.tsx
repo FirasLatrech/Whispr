@@ -10,6 +10,7 @@ import { CONFIG } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
 import { Lock, Mic } from "lucide-react";
+import GitHubStars from "@/components/GitHubStars";
 import dynamic from "next/dynamic";
 
 const Antigravity = dynamic(() => import("@/components/Antigravity"), {
@@ -75,6 +76,8 @@ export default function Home() {
             voice &amp; images
           </span>
         </div>
+
+        <GitHubStars />
       </div>
     </div>
   );
