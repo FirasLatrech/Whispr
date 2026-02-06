@@ -252,6 +252,14 @@ export default function ChatPage() {
     router.push("/");
   }, [router]);
 
+  const canSend = useMemo(() => encrypted && peerConnected, [encrypted, peerConnected]);
+
+  const emptyStateMessage = useMemo(() => {
+    if (!peerConnected) return "Share the link to invite someone";
+    if (!encrypted) return "Establishing encryption...";
+    return "Send a message to start the conversation";
+  }, [peerConnected, encrypted]);
+
   // --------------------------------------------------------
   // Chat ended screen
   // --------------------------------------------------------
@@ -354,14 +362,6 @@ export default function ChatPage() {
   // --------------------------------------------------------
   // Main chat UI
   // --------------------------------------------------------
-
-  const canSend = useMemo(() => encrypted && peerConnected, [encrypted, peerConnected]);
-
-  const emptyStateMessage = useMemo(() => {
-    if (!peerConnected) return "Share the link to invite someone";
-    if (!encrypted) return "Establishing encryption...";
-    return "Send a message to start the conversation";
-  }, [peerConnected, encrypted]);
 
   return (
     <div className="min-h-screen flex flex-col w-full">
