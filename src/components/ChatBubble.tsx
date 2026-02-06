@@ -7,11 +7,12 @@
 // base64 data URLs only.
 // ============================================================
 
+import { memo } from "react";
 import type { ChatMessage } from "@/types";
 import { cn, formatTime } from "@/lib/utils";
 import VoicePlayer from "./VoicePlayer";
 
-export default function ChatBubble({ msg }: { msg: ChatMessage }) {
+function ChatBubble({ msg }: { msg: ChatMessage }) {
   const mine = msg.isMine;
 
   return (
@@ -63,3 +64,15 @@ export default function ChatBubble({ msg }: { msg: ChatMessage }) {
     </div>
   );
 }
+
+export default memo(ChatBubble, (prev, next) => {
+  return (
+    prev.msg.id === next.msg.id &&
+    prev.msg.timestamp === next.msg.timestamp &&
+    prev.msg.text === next.msg.text &&
+    prev.msg.data === next.msg.data &&
+    prev.msg.sender === next.msg.sender &&
+    prev.msg.type === next.msg.type &&
+    prev.msg.isMine === next.msg.isMine
+  );
+});

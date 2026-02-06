@@ -5,8 +5,15 @@
 let audioContext: AudioContext | null = null;
 
 async function getAudioContext(): Promise<AudioContext> {
+  if (typeof window === "undefined") {
+    throw new Error("AudioContext not available in SSR");
+  }
   if (!audioContext) {
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) {
+      throw new Error("AudioContext not supported");
+    }
+    audioContext = new AudioContextClass();
   }
   // Resume audio context if suspended (browser autoplay policy)
   if (audioContext.state === "suspended") {

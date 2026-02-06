@@ -34,6 +34,8 @@ export function useMessages(
 
   // Reset flags and reload messages when room changes
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    
     if (currentRoomId.current !== roomId) {
       currentRoomId.current = roomId;
       syncHistorySent.current = false;
@@ -50,6 +52,7 @@ export function useMessages(
 
   // Listen for incoming messages
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const socket = getSocket();
 
     const handler = async (wire: {
@@ -87,8 +90,10 @@ export function useMessages(
         // Only update if still in same room
         if (currentRoomId.current === roomId) {
           setMessages((prev) => {
-            const exists = prev.some((m) => m.timestamp === saved.timestamp && m.sender === saved.sender);
-            return exists ? prev : [...prev, saved];
+            const messageKey = `${saved.timestamp}-${saved.sender}`;
+            const existingKeys = new Set(prev.map((m) => `${m.timestamp}-${m.sender}`));
+            if (existingKeys.has(messageKey)) return prev;
+            return [...prev, saved];
           });
           playMessageReceivedSound();
         }
@@ -105,7 +110,7 @@ export function useMessages(
 
   // Sync history to new peer when they join
   useEffect(() => {
-    if (!isFirstUser || !sharedKey || syncHistorySent.current) return;
+    if (typeof window === "undefined" || !isFirstUser || !sharedKey || syncHistorySent.current) return;
 
     const socket = getSocket();
     const handler = async () => {
@@ -139,6 +144,7 @@ export function useMessages(
 
   // Receive synced history
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const socket = getSocket();
 
     const handler = async ({ messages: encMsgs }: { messages: Array<{
@@ -151,12 +157,19 @@ export function useMessages(
       const key = sharedKeyRef.current;
       if (!key || !Array.isArray(encMsgs)) return;
 
+      const messagesToSave: ChatMessage[] = [];
+      const messageKeys = new Set<string>();
+
       for (const wire of encMsgs) {
         try {
           const plaintext = await decrypt(key, wire.encrypted, wire.iv);
           const parsed = JSON.parse(plaintext) as { text?: string; data?: string };
+          const messageKey = `${wire.timestamp}-${wire.sender}`;
 
-          await saveMessage({
+          if (messageKeys.has(messageKey)) continue;
+          messageKeys.add(messageKey);
+
+          const saved = await saveMessage({
             roomId,
             sender: sanitizeName(wire.sender),
             type: wire.type,
@@ -165,14 +178,16 @@ export function useMessages(
             timestamp: wire.timestamp,
             isMine: false,
           });
+          messagesToSave.push(saved);
         } catch {
           // skip corrupted messages
         }
       }
 
-      // Reload from DB to get proper ordering
-      const all = await getMessages(roomId);
-      setMessages(all);
+      if (messagesToSave.length > 0) {
+        const all = await getMessages(roomId);
+        setMessages(all);
+      }
     };
 
     socket.on("sync-history", handler);
@@ -224,8 +239,10 @@ export function useMessages(
         // Only update if still in same room
         if (currentRoomId.current === roomId) {
           setMessages((prev) => {
-            const exists = prev.some((m) => m.timestamp === saved.timestamp && m.sender === saved.sender);
-            return exists ? prev : [...prev, saved];
+            const messageKey = `${saved.timestamp}-${saved.sender}`;
+            const existingKeys = new Set(prev.map((m) => `${m.timestamp}-${m.sender}`));
+            if (existingKeys.has(messageKey)) return prev;
+            return [...prev, saved];
           });
           playMessageSentSound();
         }

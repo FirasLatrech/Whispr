@@ -40,9 +40,17 @@ export function useSocket() {
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const s = getSocket();
-    socketRef.current = s;
-    s.connect();
+    if (typeof window === "undefined") return;
+    
+    let s: Socket;
+    try {
+      s = getSocket();
+      socketRef.current = s;
+      s.connect();
+    } catch (error) {
+      console.error("[useSocket] Failed to initialize socket:", error);
+      return;
+    }
 
     s.on("connect", () => setConnected(true));
     s.on("disconnect", () => {

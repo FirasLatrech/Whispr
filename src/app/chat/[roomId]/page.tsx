@@ -11,7 +11,7 @@
 //   5. "End chat" wipes IndexedDB + sessionStorage
 // ============================================================
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSocket } from "@/hooks/useSocket";
 import { useMessages } from "@/hooks/useMessages";
@@ -123,8 +123,13 @@ export default function ChatPage() {
 
   // Play typing sound when peer starts typing
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (typingUser && typingUser !== prevTypingUser.current) {
-      playTypingSound();
+      try {
+        playTypingSound();
+      } catch (error) {
+        // Silently fail if sound can't play
+      }
       prevTypingUser.current = typingUser;
     } else if (!typingUser) {
       prevTypingUser.current = null;
@@ -133,7 +138,7 @@ export default function ChatPage() {
 
   // Rejoin room when socket connects (for reload scenario)
   useEffect(() => {
-    if (hasAttemptedRejoin.current) return;
+    if (typeof window === "undefined" || hasAttemptedRejoin.current) return;
     
     const saved = getStoredName(roomId);
     if (saved && connected && joined) {
@@ -144,6 +149,7 @@ export default function ChatPage() {
 
   // auto-scroll on new messages
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
@@ -151,6 +157,7 @@ export default function ChatPage() {
 
   // scroll progress indicator
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const el = scrollRef.current;
     if (!el) return;
 
@@ -176,12 +183,11 @@ export default function ChatPage() {
 
   // handle chat ended
   useEffect(() => {
-    if (chatEnded) {
-      clearStoredName(roomId);
-      setJoined(false);
-      clear();
-      setTimeout(() => router.push("/"), 1500);
-    }
+    if (typeof window === "undefined" || !chatEnded) return;
+    clearStoredName(roomId);
+    setJoined(false);
+    clear();
+    setTimeout(() => router.push("/"), 1500);
   }, [chatEnded, clear, router, roomId]);
 
   const handleJoin = useCallback(
@@ -189,21 +195,21 @@ export default function ChatPage() {
       e.preventDefault();
       const cleaned = sanitizeName(name);
       if (!cleaned) return;
-      setName(cleaned);
+      setName((prev) => (prev !== cleaned ? cleaned : prev));
       storeName(roomId, cleaned);
       joinRoom(roomId, cleaned);
-      setJoined(true);
+      setJoined((prev) => (prev ? prev : true));
     },
     [name, roomId, joinRoom]
   );
 
-  function handleEndChat() {
+  const handleEndChat = useCallback(() => {
     clearStoredName(roomId);
     setJoined(false);
     endChat(roomId);
     clear();
     router.push("/");
-  }
+  }, [roomId, endChat, clear, router]);
 
 
   const handleSendText = useCallback(
@@ -233,6 +239,18 @@ export default function ChatPage() {
     },
     [name, sendMessage]
   );
+
+  const handleTyping = useCallback(() => {
+    sendTyping(roomId, name);
+  }, [roomId, name, sendTyping]);
+
+  const handleStopTyping = useCallback(() => {
+    stopTyping(roomId);
+  }, [roomId, stopTyping]);
+
+  const handleGoHome = useCallback(() => {
+    router.push("/");
+  }, [router]);
 
   // --------------------------------------------------------
   // Chat ended screen
@@ -321,7 +339,11 @@ export default function ChatPage() {
           <p className="text-xs text-muted-foreground/60">
             This room already has 2 participants
           </p>
-          <Button variant="outline" size="sm" onClick={() => router.push("/")}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleGoHome}
+          >
             Go home
           </Button>
         </div>
@@ -333,7 +355,13 @@ export default function ChatPage() {
   // Main chat UI
   // --------------------------------------------------------
 
-  const canSend = encrypted && peerConnected;
+  const canSend = useMemo(() => encrypted && peerConnected, [encrypted, peerConnected]);
+
+  const emptyStateMessage = useMemo(() => {
+    if (!peerConnected) return "Share the link to invite someone";
+    if (!encrypted) return "Establishing encryption...";
+    return "Send a message to start the conversation";
+  }, [peerConnected, encrypted]);
 
   return (
     <div className="min-h-screen flex flex-col w-full">
@@ -363,22 +391,20 @@ export default function ChatPage() {
         <div
           ref={scrollRef}
           className="flex-1 overflow-y-auto py-4 px-4 space-y-3 scrollbar-hide"
+          style={{ contentVisibility: "auto" }}
         >
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full">
               <p className="text-sm text-muted-foreground/40">
-                {peerConnected
-                  ? encrypted
-                    ? "Send a message to start the conversation"
-                    : "Establishing encryption..."
-                  : "Share the link to invite someone"}
+                {emptyStateMessage}
               </p>
             </div>
           )}
-          {messages.map((msg) => (
-            <ChatBubble key={msg.id ?? msg.timestamp} msg={msg} />
-          ))}
-          {typingUser && <TypingIndicator name={typingUser} />}
+          {messages.map((msg) => {
+            const key = msg.id ?? `${msg.timestamp}-${msg.sender}`;
+            return <ChatBubble key={key} msg={msg} />;
+          })}
+          {typingUser ? <TypingIndicator name={typingUser} /> : null}
         </div>
 
         <ChatInput
@@ -386,12 +412,8 @@ export default function ChatPage() {
           onSendImage={handleSendImage}
           onSendVoice={handleSendVoice}
           onSendGif={handleSendGif}
-          onTyping={useCallback(() => {
-            sendTyping(roomId, name);
-          }, [roomId, name, sendTyping])}
-          onStopTyping={useCallback(() => {
-            stopTyping(roomId);
-          }, [roomId, stopTyping])}
+          onTyping={handleTyping}
+          onStopTyping={handleStopTyping}
           disabled={!canSend}
         />
       </div>
