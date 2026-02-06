@@ -25,6 +25,8 @@ import type { Socket } from "socket.io-client";
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [peerName, setPeerName] = useState<string | null>(null);
   const [peerConnected, setPeerConnected] = useState(false);
   const [roomFull, setRoomFull] = useState(false);
@@ -38,27 +40,83 @@ export function useSocket() {
   const roomIdRef = useRef<string | null>(null);
   const keySentRef = useRef(false);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    
+    setConnecting(true);
+    setConnectionError(null);
     
     let s: Socket;
     try {
       s = getSocket();
       socketRef.current = s;
+      
+      connectionTimeoutRef.current = setTimeout(() => {
+        if (!s.connected) {
+          console.error("[useSocket] Connection timeout after 20 seconds");
+          setConnectionError("Connection timeout. Please check your network and try again.");
+          setConnecting(false);
+          setConnected(false);
+        }
+      }, 20000);
+      
       s.connect();
     } catch (error) {
       console.error("[useSocket] Failed to initialize socket:", error);
+      setConnectionError(error instanceof Error ? error.message : "Failed to initialize socket");
+      setConnecting(false);
+      setConnected(false);
       return;
     }
 
-    s.on("connect", () => setConnected(true));
-    s.on("disconnect", () => {
+    s.on("connect", () => {
+      console.log("[useSocket] ✅ Socket connected");
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
+      setConnected(true);
+      setConnecting(false);
+      setConnectionError(null);
+    });
+    
+    s.on("connect_error", (error) => {
+      console.error("[useSocket] Connection error:", error.message);
+      setConnectionError(error.message || "Connection failed");
       setConnected(false);
+      setConnecting(false);
+    });
+    
+    s.on("disconnect", (reason) => {
+      console.warn("[useSocket] Disconnected:", reason);
+      setConnected(false);
+      setConnecting(false);
       setPeerConnected(false);
       setEncrypted(false);
       setSharedKey(null);
       keySentRef.current = false;
+      
+      if (reason === "io server disconnect") {
+        setConnectionError("Server disconnected");
+      } else if (reason === "transport close" || reason === "transport error") {
+        setConnectionError("Connection lost");
+        setConnecting(true);
+      }
+    });
+    
+    s.on("reconnect", () => {
+      console.log("[useSocket] ✅ Reconnected");
+      setConnected(true);
+      setConnecting(false);
+      setConnectionError(null);
+    });
+    
+    s.on("reconnect_failed", () => {
+      console.error("[useSocket] ❌ Reconnection failed");
+      setConnectionError("Failed to reconnect. Please refresh the page.");
+      setConnecting(false);
     });
 
     // joined room — generate key pair; if a peer already exists, note them
@@ -140,7 +198,12 @@ export function useSocket() {
     });
 
     return () => {
-      disconnectSocket();
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+      }
+      if (typingTimeout.current) {
+        clearTimeout(typingTimeout.current);
+      }
     };
   }, []);
 
@@ -169,6 +232,8 @@ export function useSocket() {
 
   return {
     connected,
+    connecting,
+    connectionError,
     peerName,
     peerConnected,
     roomFull,

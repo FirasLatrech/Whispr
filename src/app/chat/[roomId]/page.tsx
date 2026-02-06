@@ -104,6 +104,8 @@ export default function ChatPage() {
 
   const {
     connected,
+    connecting,
+    connectionError,
     peerName,
     peerConnected,
     roomFull,
@@ -381,6 +383,8 @@ export default function ChatPage() {
           </div>
           <StatusBanner
             connected={connected}
+            connecting={connecting}
+            connectionError={connectionError}
             peerConnected={peerConnected}
             peerName={peerName}
             roomFull={roomFull}

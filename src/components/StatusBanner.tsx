@@ -6,6 +6,8 @@
 
 interface StatusBannerProps {
   connected: boolean;
+  connecting: boolean;
+  connectionError: string | null;
   peerConnected: boolean;
   peerName: string | null;
   roomFull: boolean;
@@ -14,12 +16,23 @@ interface StatusBannerProps {
 
 export default function StatusBanner({
   connected,
+  connecting,
+  connectionError,
   peerConnected,
   peerName,
   roomFull,
   encrypted,
 }: StatusBannerProps) {
-  if (!connected) {
+  if (connectionError) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-2 px-4 text-sm text-destructive bg-destructive/10 rounded-lg">
+        <span className="size-1.5 rounded-full bg-destructive" />
+        {connectionError}
+      </div>
+    );
+  }
+
+  if (connecting || !connected) {
     return (
       <div className="flex items-center justify-center gap-2 py-2 px-4 text-sm text-muted-foreground bg-muted rounded-lg">
         <span className="size-1.5 rounded-full bg-muted-foreground animate-pulse" />

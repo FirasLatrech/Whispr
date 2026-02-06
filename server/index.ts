@@ -62,10 +62,15 @@ app.prepare().then(() => {
     handle(req, res);
   });
 
+  const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
+    : dev ? "*" : false;
+  
   const io = new Server(httpServer, {
     cors: {
-      origin: dev ? "*" : false,
+      origin: allowedOrigins,
       methods: ["GET", "POST"],
+      credentials: true,
     },
     maxHttpBufferSize: 6 * 1024 * 1024,
     pingInterval: 25000,
