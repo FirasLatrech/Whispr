@@ -45,10 +45,14 @@ export function getSocket(): Socket {
       forceNew: false,
     });
     
-    socket.on("connect_error", (error) => {
+    socket.on("connect_error", (error: Error) => {
       console.error("[Socket] Connection error:", error.message);
-      console.error("[Socket] Error type:", error.type);
-      console.error("[Socket] Error description:", error.description);
+      if (error instanceof Error) {
+        console.error("[Socket] Error name:", error.name);
+        if ("description" in error) {
+          console.error("[Socket] Error description:", (error as any).description);
+        }
+      }
     });
     
     socket.on("connect", () => {
