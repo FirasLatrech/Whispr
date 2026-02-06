@@ -19,31 +19,6 @@ async function getAudioContext(): Promise<AudioContext> {
   return audioContext;
 }
 
-function playTone(frequency: number, duration: number, type: OscillatorType = "sine", volume: number = 0.1, frequencyEnd?: number): void {
-  try {
-    const ctx = getAudioContext();
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
-    oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
-    if (frequencyEnd) {
-      oscillator.frequency.exponentialRampToValueAtTime(frequencyEnd, ctx.currentTime + duration);
-    }
-    oscillator.type = type;
-
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + duration);
-  } catch (error) {
-    // Audio context might not be available (e.g., autoplay restrictions)
-  }
-}
 
 async function playWhooshSound(): Promise<void> {
   try {

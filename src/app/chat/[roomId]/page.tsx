@@ -34,24 +34,38 @@ const Antigravity = dynamic(() => import("@/components/Antigravity"), {
 const SESSION_KEY_PREFIX = "whispr:name:";
 const CHAT_ACTIVE_KEY_PREFIX = "whispr:active:";
 
+const storageCache = new Map<string, { name: string; active: boolean }>();
+
 function getStoredName(roomId: string): string {
   if (typeof window === "undefined") return "";
-  return sessionStorage.getItem(`${SESSION_KEY_PREFIX}${roomId}`) || "";
+  const cached = storageCache.get(roomId);
+  if (cached) return cached.name;
+  const name = sessionStorage.getItem(`${SESSION_KEY_PREFIX}${roomId}`) || "";
+  const active = sessionStorage.getItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`) === "true";
+  storageCache.set(roomId, { name, active });
+  return name;
 }
 
 function storeName(roomId: string, name: string): void {
   sessionStorage.setItem(`${SESSION_KEY_PREFIX}${roomId}`, name);
   sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
+  storageCache.set(roomId, { name, active: true });
 }
 
 function clearStoredName(roomId: string): void {
   sessionStorage.removeItem(`${SESSION_KEY_PREFIX}${roomId}`);
   sessionStorage.removeItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`);
+  storageCache.delete(roomId);
 }
 
 function isChatActive(roomId: string): boolean {
   if (typeof window === "undefined") return false;
-  return sessionStorage.getItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`) === "true";
+  const cached = storageCache.get(roomId);
+  if (cached) return cached.active;
+  const active = sessionStorage.getItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`) === "true";
+  const name = sessionStorage.getItem(`${SESSION_KEY_PREFIX}${roomId}`) || "";
+  storageCache.set(roomId, { name, active });
+  return active;
 }
 
 export default function ChatPage() {
@@ -69,9 +83,9 @@ export default function ChatPage() {
 
   // Set active flag if we have a saved name but no active flag (backward compatibility)
   useEffect(() => {
-    if (savedName && !chatActive && typeof window !== "undefined") {
-      sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
-    }
+    if (!savedName || chatActive || typeof window === "undefined") return;
+    sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
+    storageCache.set(roomId, { name: savedName, active: true });
   }, [savedName, chatActive, roomId]);
 
   const {
@@ -117,8 +131,9 @@ export default function ChatPage() {
   // auto-scroll on new messages
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, typingUser]);
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages.length, typingUser]);
 
   // scroll progress indicator
   useEffect(() => {
@@ -132,10 +147,10 @@ export default function ChatPage() {
       const clientHeight = el.clientHeight;
       const totalScroll = scrollHeight - clientHeight;
       const progress = totalScroll > 0 ? (scrollTop / totalScroll) * 100 : 0;
-      setScrollProgress(progress);
+      setScrollProgress((prev) => (prev !== progress ? progress : prev));
     }
 
-    el.addEventListener("scroll", updateScrollProgress);
+    el.addEventListener("scroll", updateScrollProgress, { passive: true });
     updateScrollProgress();
 
     return () => {
@@ -143,7 +158,7 @@ export default function ChatPage() {
         el.removeEventListener("scroll", updateScrollProgress);
       }
     };
-  }, [messages]);
+  }, []);
 
   // handle chat ended
   useEffect(() => {
@@ -164,7 +179,6 @@ export default function ChatPage() {
       storeName(roomId, cleaned);
       joinRoom(roomId, cleaned);
       setJoined(true);
-      sessionStorage.setItem(`${CHAT_ACTIVE_KEY_PREFIX}${roomId}`, "true");
     },
     [name, roomId, joinRoom]
   );
@@ -178,21 +192,33 @@ export default function ChatPage() {
   }
 
 
-  async function handleSendText(text: string) {
-    await sendMessage(name, "text", text);
-  }
+  const handleSendText = useCallback(
+    (text: string) => {
+      sendMessage(name, "text", text);
+    },
+    [name, sendMessage]
+  );
 
-  async function handleSendImage(data: string) {
-    await sendMessage(name, "image", undefined, data);
-  }
+  const handleSendImage = useCallback(
+    (data: string) => {
+      sendMessage(name, "image", undefined, data);
+    },
+    [name, sendMessage]
+  );
 
-  async function handleSendVoice(data: string) {
-    await sendMessage(name, "voice", undefined, data);
-  }
+  const handleSendVoice = useCallback(
+    (data: string) => {
+      sendMessage(name, "voice", undefined, data);
+    },
+    [name, sendMessage]
+  );
 
-  async function handleSendGif(url: string) {
-    await sendMessage(name, "gif", undefined, url);
-  }
+  const handleSendGif = useCallback(
+    (url: string) => {
+      sendMessage(name, "gif", undefined, url);
+    },
+    [name, sendMessage]
+  );
 
   // --------------------------------------------------------
   // Chat ended screen
@@ -346,8 +372,12 @@ export default function ChatPage() {
           onSendImage={handleSendImage}
           onSendVoice={handleSendVoice}
           onSendGif={handleSendGif}
-          onTyping={() => sendTyping(roomId, name)}
-          onStopTyping={() => stopTyping(roomId)}
+          onTyping={useCallback(() => {
+            sendTyping(roomId, name);
+          }, [roomId, name, sendTyping])}
+          onStopTyping={useCallback(() => {
+            stopTyping(roomId);
+          }, [roomId, stopTyping])}
           disabled={!canSend}
         />
       </div>

@@ -86,7 +86,10 @@ export function useMessages(
         
         // Only update if still in same room
         if (currentRoomId.current === roomId) {
-          setMessages((prev) => [...prev, saved]);
+          setMessages((prev) => {
+            const exists = prev.some((m) => m.timestamp === saved.timestamp && m.sender === saved.sender);
+            return exists ? prev : [...prev, saved];
+          });
           playMessageReceivedSound();
         }
       } catch (error) {
@@ -220,7 +223,10 @@ export function useMessages(
         
         // Only update if still in same room
         if (currentRoomId.current === roomId) {
-          setMessages((prev) => [...prev, saved]);
+          setMessages((prev) => {
+            const exists = prev.some((m) => m.timestamp === saved.timestamp && m.sender === saved.sender);
+            return exists ? prev : [...prev, saved];
+          });
           playMessageSentSound();
         }
       } catch (error) {
