@@ -23,7 +23,6 @@ import ChatBubble from "@/components/ChatBubble";
 import ChatInput from "@/components/ChatInput";
 import StatusBanner from "@/components/StatusBanner";
 import TypingIndicator from "@/components/TypingIndicator";
-import CaptchaChallenge from "@/components/CaptchaChallenge";
 import GitHubStars from "@/components/GitHubStars";
 import dynamic from "next/dynamic";
 
@@ -53,8 +52,6 @@ export default function ChatPage() {
 
   const [name, setName] = useState("");
   const [joined, setJoined] = useState(false);
-  const [captchaId, setCaptchaId] = useState("");
-  const [captchaAnswer, setCaptchaAnswer] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -63,7 +60,6 @@ export default function ChatPage() {
     peerConnected,
     roomFull,
     chatEnded,
-    captchaFailed,
     typingUser,
     encrypted,
     sharedKey,
@@ -72,7 +68,6 @@ export default function ChatPage() {
     endChat,
     sendTyping,
     stopTyping,
-    resetCaptchaFailed,
   } = useSocket();
 
   const { messages, sendMessage, clear } = useMessages(roomId, sharedKey, isFirstUser);
@@ -84,7 +79,7 @@ export default function ChatPage() {
     const saved = getStoredName(roomId);
     if (saved) {
       setName(saved);
-      joinRoom(roomId, saved, undefined, undefined, true);
+      joinRoom(roomId, saved, true);
       setJoined(true);
     }
   }, [roomId, joinRoom]);
@@ -108,14 +103,13 @@ export default function ChatPage() {
     (e: React.FormEvent) => {
       e.preventDefault();
       const cleaned = sanitizeName(name);
-      if (!cleaned || !captchaAnswer.trim()) return;
+      if (!cleaned) return;
       setName(cleaned);
       storeName(roomId, cleaned);
-      resetCaptchaFailed();
-      joinRoom(roomId, cleaned, captchaId, captchaAnswer);
+      joinRoom(roomId, cleaned);
       setJoined(true);
     },
-    [name, roomId, captchaId, captchaAnswer, joinRoom, resetCaptchaFailed]
+    [name, roomId, joinRoom]
   );
 
   function handleEndChat() {
@@ -125,18 +119,6 @@ export default function ChatPage() {
     router.push("/");
   }
 
-  // if CAPTCHA failed, boot back to join screen
-  useEffect(() => {
-    if (captchaFailed) {
-      setJoined(false);
-      clearStoredName(roomId);
-    }
-  }, [captchaFailed, roomId]);
-
-  const handleCaptchaChange = useCallback((id: string, answer: string) => {
-    setCaptchaId(id);
-    setCaptchaAnswer(answer);
-  }, []);
 
   async function handleSendText(text: string) {
     await sendMessage(name, "text", text);
@@ -213,15 +195,9 @@ export default function ChatPage() {
             maxLength={24}
             className="w-56 text-center pointer-events-auto"
           />
-          <div className="pointer-events-auto">
-            <CaptchaChallenge
-              onChange={handleCaptchaChange}
-              failed={captchaFailed}
-            />
-          </div>
           <Button
             type="submit"
-            disabled={!name.trim() || !captchaAnswer.trim()}
+            disabled={!name.trim()}
             className="rounded-xl pointer-events-auto"
           >
             Join

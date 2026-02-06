@@ -41,8 +41,6 @@ export interface KeyExchangePayload {
 export interface JoinRoomPayload {
   roomId: string;
   name: string;
-  captchaId?: string;
-  captchaAnswer?: string;
   rejoining?: boolean;
 }
 

@@ -11,7 +11,6 @@
 //   7. Room membership verification before relay
 //   8. Auto-expiry of idle rooms
 //   9. The server NEVER sees plaintext messages (E2EE)
-//  10. SVG CAPTCHA verification before room join
 //
 // The server is a dumb relay — it forwards encrypted blobs
 // between two authenticated peers. Nothing is stored.
@@ -23,7 +22,6 @@ import { Server } from "socket.io";
 import { roomManager } from "./roomManager.js";
 import { rateLimiter } from "./lib/rateLimiter.js";
 import { applySecurityHeaders } from "./lib/securityHeaders.js";
-import { captchaStore } from "./lib/captchaStore.js";
 import {
   isValidRoomId,
   isValidName,
@@ -60,16 +58,6 @@ function getClientIp(headers: Record<string, string | string[] | undefined>): st
 app.prepare().then(() => {
   const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     applySecurityHeaders(req, res);
-
-    // ---------------------------------------------------------
-    // CAPTCHA API — must be handled before Next.js catch-all
-    // ---------------------------------------------------------
-    if (req.method === "GET" && req.url === "/api/captcha") {
-      const challenge = captchaStore.create();
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(challenge));
-      return;
-    }
 
     handle(req, res);
   });
@@ -114,7 +102,7 @@ app.prepare().then(() => {
 
     socket.on("join-room", (payload: unknown) => {
       if (!payload || typeof payload !== "object") return;
-      const { roomId, name, captchaId, captchaAnswer, rejoining } = payload as Record<string, unknown>;
+      const { roomId, name, rejoining } = payload as Record<string, unknown>;
 
       if (!isValidRoomId(roomId)) {
         socket.emit("error-msg", { message: "Invalid room ID" });
@@ -123,18 +111,6 @@ app.prepare().then(() => {
       if (!isValidName(name)) {
         socket.emit("error-msg", { message: "Invalid name" });
         return;
-      }
-
-      // CAPTCHA verification — skip for reconnects (page reload)
-      if (rejoining !== true) {
-        if (typeof captchaId !== "string" || typeof captchaAnswer !== "string") {
-          socket.emit("error-msg", { message: "CAPTCHA required" });
-          return;
-        }
-        if (!captchaStore.verify(captchaId, captchaAnswer)) {
-          socket.emit("captcha-failed");
-          return;
-        }
       }
 
       const cleanName = sanitizeName(name as string);
@@ -297,6 +273,6 @@ app.prepare().then(() => {
 
   httpServer.listen(port, () => {
     console.log(`> Whispr ready on http://${hostname}:${port}`);
-    console.log(`> Security: headers, rate-limiting, validation, CAPTCHA, E2EE relay`);
+    console.log(`> Security: headers, rate-limiting, validation, E2EE relay`);
   });
 });

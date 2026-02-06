@@ -52,23 +52,21 @@ The server is a dumb relay. It forwards opaque ciphertext between two authentica
 
 1. **End-to-end encryption** — ECDH key exchange + AES-256-GCM. The server never sees plaintext.
 2. **Zero server storage** — Messages exist only in each user's browser (IndexedDB). The server holds nothing.
-3. **SVG CAPTCHA** — Required before joining any room.
-4. **Rate limiting** — 30 messages per 10-second window per socket.
-5. **IP connection limits** — Max 5 concurrent connections per IP.
-6. **HMAC room tokens** — Rooms are signed with a boot-time secret (constant-time verification).
-7. **Input validation** — Every socket event payload is validated server-side.
-8. **Security headers** — Applied to all HTTP responses.
-9. **Room caps** — Max 2 users per room. Rooms auto-expire after 1 hour of inactivity.
-10. **Image compression** — Client-side, capped at 800px width / 70% quality before encryption.
+3. **Rate limiting** — 30 messages per 10-second window per socket.
+4. **IP connection limits** — Max 5 concurrent connections per IP.
+5. **HMAC room tokens** — Rooms are signed with a boot-time secret (constant-time verification).
+6. **Input validation** — Every socket event payload is validated server-side.
+7. **Security headers** — Applied to all HTTP responses.
+8. **Room caps** — Max 2 users per room. Rooms auto-expire after 1 hour of inactivity.
+9. **Image compression** — Client-side, capped at 800px width / 70% quality before encryption.
 
 ## Project structure
 
 ```
 server/
-  index.ts              Custom HTTP + Socket.IO server (10 security layers)
+  index.ts              Custom HTTP + Socket.IO server (9 security layers)
   roomManager.ts        In-memory room state (max 2 users, HMAC tokens, auto-expiry)
   lib/
-    captchaStore.ts     SVG CAPTCHA generation + verification
     rateLimiter.ts      Per-socket message rate limiting
     securityHeaders.ts  HTTP security headers
     validate.ts         Input validation helpers
@@ -83,7 +81,6 @@ src/
 
   components/
     Antigravity.tsx     Three.js particle background
-    CaptchaChallenge.tsx SVG CAPTCHA input
     ChatBubble.tsx      Single message render (text/image/gif/voice)
     ChatHeader.tsx      Room info, E2EE badge, copy link, end chat
     ChatInput.tsx       Text input + emoji + GIF + image + voice recording

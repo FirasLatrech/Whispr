@@ -29,7 +29,6 @@ export function useSocket() {
   const [peerConnected, setPeerConnected] = useState(false);
   const [roomFull, setRoomFull] = useState(false);
   const [chatEnded, setChatEnded] = useState(false);
-  const [captchaFailed, setCaptchaFailed] = useState(false);
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const [encrypted, setEncrypted] = useState(false);
   const [sharedKey, setSharedKey] = useState<CryptoKey | null>(null);
@@ -119,7 +118,6 @@ export function useSocket() {
 
     s.on("room-full", () => setRoomFull(true));
     s.on("chat-ended", () => setChatEnded(true));
-    s.on("captcha-failed", () => setCaptchaFailed(true));
 
     s.on("typing", ({ name }: { name: string }) => {
       setTypingUser(name);
@@ -139,10 +137,9 @@ export function useSocket() {
   }, []);
 
   const joinRoom = useCallback(
-    (roomId: string, name: string, captchaId?: string, captchaAnswer?: string, rejoining?: boolean) => {
+    (roomId: string, name: string, rejoining?: boolean) => {
       roomIdRef.current = roomId;
-      setCaptchaFailed(false);
-      socketRef.current?.emit("join-room", { roomId, name, captchaId, captchaAnswer, rejoining });
+      socketRef.current?.emit("join-room", { roomId, name, rejoining });
     },
     []
   );
@@ -162,17 +159,12 @@ export function useSocket() {
     socketRef.current?.emit("stop-typing", { roomId });
   }, []);
 
-  const resetCaptchaFailed = useCallback(() => {
-    setCaptchaFailed(false);
-  }, []);
-
   return {
     connected,
     peerName,
     peerConnected,
     roomFull,
     chatEnded,
-    captchaFailed,
     typingUser,
     encrypted,
     sharedKey,
@@ -181,6 +173,5 @@ export function useSocket() {
     endChat,
     sendTyping,
     stopTyping,
-    resetCaptchaFailed,
   };
 }
