@@ -14,12 +14,16 @@ function getSocketUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
   if (envUrl && envUrl.trim()) {
     const url = envUrl.trim();
-    console.log("[Socket] Using NEXT_PUBLIC_SOCKET_URL:", url);
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Socket] Using NEXT_PUBLIC_SOCKET_URL:", url);
+    }
     return url;
   }
   
   const origin = window.location.origin;
-  console.log("[Socket] Using window.location.origin:", origin);
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Socket] Using window.location.origin:", origin);
+  }
   return origin;
 }
 
@@ -32,7 +36,11 @@ export function getSocket(): Socket {
     const url = getSocketUrl();
     const socketUrl = url || window.location.origin;
     
-    console.log("[Socket] Initializing connection to:", socketUrl);
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Socket] Initializing connection to:", socketUrl);
+    }
+    
+    const isVercel = socketUrl.includes("vercel.app") || socketUrl.includes("vercel.com");
     
     socket = io(socketUrl, {
       autoConnect: false,
@@ -41,45 +49,45 @@ export function getSocket(): Socket {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-      transports: ["websocket", "polling"],
+      transports: isVercel ? ["polling"] : ["polling", "websocket"],
+      upgrade: !isVercel,
       forceNew: false,
     });
     
     socket.on("connect_error", (error: Error) => {
-      console.error("[Socket] Connection error:", error.message);
-      if (error instanceof Error) {
-        console.error("[Socket] Error name:", error.name);
-        if ("description" in error) {
-          console.error("[Socket] Error description:", (error as any).description);
-        }
+      if (process.env.NODE_ENV === "development") {
+        console.error("[Socket] Connection error:", error.message);
       }
     });
     
     socket.on("connect", () => {
-      console.log("[Socket] ✅ Connected successfully to:", socketUrl);
-    });
-    
-    socket.on("disconnect", (reason) => {
-      console.warn("[Socket] Disconnected:", reason);
-      if (reason === "io server disconnect") {
-        console.warn("[Socket] Server disconnected the socket");
-      } else if (reason === "io client disconnect") {
-        console.warn("[Socket] Client disconnected");
-      } else {
-        console.warn("[Socket] Connection lost, will attempt to reconnect");
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Socket] ✅ Connected successfully");
       }
     });
     
-    socket.on("reconnect", (attemptNumber) => {
-      console.log("[Socket] ✅ Reconnected after", attemptNumber, "attempts");
+    socket.on("disconnect", (reason) => {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[Socket] Disconnected:", reason);
+      }
     });
     
-    socket.on("reconnect_attempt", (attemptNumber) => {
-      console.log("[Socket] Reconnection attempt", attemptNumber);
+    socket.on("reconnect", () => {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Socket] ✅ Reconnected");
+      }
     });
     
-    socket.on("reconnect_error", (error) => {
-      console.error("[Socket] Reconnection error:", error.message);
+    socket.on("reconnect_attempt", () => {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Socket] Reconnection attempt...");
+      }
+    });
+    
+    socket.on("reconnect_error", (error: Error) => {
+      if (process.env.NODE_ENV === "development") {
+        console.error("[Socket] Reconnection error:", error.message);
+      }
     });
     
     socket.on("reconnect_failed", () => {

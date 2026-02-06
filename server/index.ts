@@ -76,6 +76,8 @@ app.prepare().then(() => {
     pingInterval: 25000,
     pingTimeout: 20000,
     connectTimeout: 10000,
+    transports: ["polling", "websocket"],
+    allowEIO3: true,
   });
 
   // ===========================================================

@@ -55,7 +55,9 @@ export function useSocket() {
       
       connectionTimeoutRef.current = setTimeout(() => {
         if (!s.connected) {
-          console.error("[useSocket] Connection timeout after 20 seconds");
+          if (process.env.NODE_ENV === "development") {
+            console.error("[useSocket] Connection timeout after 20 seconds");
+          }
           setConnectionError("Connection timeout. Please check your network and try again.");
           setConnecting(false);
           setConnected(false);
@@ -72,7 +74,9 @@ export function useSocket() {
     }
 
     s.on("connect", () => {
-      console.log("[useSocket] ✅ Socket connected");
+      if (process.env.NODE_ENV === "development") {
+        console.log("[useSocket] ✅ Socket connected");
+      }
       if (connectionTimeoutRef.current) {
         clearTimeout(connectionTimeoutRef.current);
         connectionTimeoutRef.current = null;
@@ -82,15 +86,20 @@ export function useSocket() {
       setConnectionError(null);
     });
     
-    s.on("connect_error", (error) => {
-      console.error("[useSocket] Connection error:", error.message);
-      setConnectionError(error.message || "Connection failed");
+    s.on("connect_error", (error: Error) => {
+      const errorMessage = error.message || "Connection failed";
+      if (process.env.NODE_ENV === "development") {
+        console.error("[useSocket] Connection error:", errorMessage);
+      }
+      setConnectionError(errorMessage);
       setConnected(false);
       setConnecting(false);
     });
     
     s.on("disconnect", (reason) => {
-      console.warn("[useSocket] Disconnected:", reason);
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[useSocket] Disconnected:", reason);
+      }
       setConnected(false);
       setConnecting(false);
       setPeerConnected(false);
@@ -107,7 +116,9 @@ export function useSocket() {
     });
     
     s.on("reconnect", () => {
-      console.log("[useSocket] ✅ Reconnected");
+      if (process.env.NODE_ENV === "development") {
+        console.log("[useSocket] ✅ Reconnected");
+      }
       setConnected(true);
       setConnecting(false);
       setConnectionError(null);
