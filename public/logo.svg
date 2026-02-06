@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#16a34a"/>
+    </linearGradient>
+  </defs>
+  <!-- Chat bubble body -->
+  <rect x="56" y="56" width="400" height="340" rx="72" ry="72" fill="url(#bg)"/>
+  <!-- Speech bubble tail - clean triangle -->
+  <path d="M100 370 L100 440 L170 370" fill="url(#bg)"/>
+  <!-- "w" letterform - clean, geometric, thick strokes -->
+  <polyline points="150,180 195,320 256,220 317,320 362,180" 
+    fill="none" stroke="white" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
